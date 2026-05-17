@@ -7,13 +7,13 @@ from config.settings import REQUEST_DELAY, REQUEST_TIMEOUT
 class GameCollector:
     
     @retry(stop=stop_after_attempt(3), wait=wait_fixed(2))
-    def get_games_by_date(self, date: str) -> list:
+    def get_games_by_date(self, date: str) -> dict:
         """
         Fetches all games for specific date format: 'YYYY-MM-DD'
         Grab both game_header df and line_score df
         """
         time.sleep(REQUEST_DELAY)  # respect rate limits
-        games = []
+        games = {}
         try:
             board = scoreboardv2.ScoreboardV2(
                 game_date=date, 
