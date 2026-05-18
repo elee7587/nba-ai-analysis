@@ -1,3 +1,6 @@
+##############################################################
+#      TRY AGAIN LATER, API IS CURRENTLY UNRELIABLE          #
+##############################################################
 from nba_api.stats.endpoints import winprobabilitypbp
 from tenacity import retry, stop_after_attempt, wait_fixed
 from loguru import logger
