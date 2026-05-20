@@ -13,7 +13,7 @@ class GameCollector:
         Grab both game_header df and line_score df
         """
         time.sleep(REQUEST_DELAY)  # respect rate limits
-        games = {}
+        games = []
         try:
             board = scoreboardv2.ScoreboardV2(
                 game_date=date, 
@@ -36,13 +36,13 @@ class GameCollector:
                 ].iloc[0]  # should only be one row
                 
                 games.append({
-                    "game_id": game_id,
-                    "game_date": date,
-                    "home_team_id": home_team_id,
-                    "away_team_id": away_team_id,
-                    "home_score": home_line['PTS'],
-                    "away_score": away_line['PTS'],
-                    "season": game['SEASON']
+                    "game_id":    str(game["GAME_ID"]),
+                    "game_date":  str(game["GAME_DATE_EST"]),
+                    "home_team":  int(game["HOME_TEAM_ID"]),
+                    "away_team":  int(game["VISITOR_TEAM_ID"]),
+                    "home_score": int(home_line["PTS"]) if home_line["PTS"] else None,
+                    "away_score": int(away_line["PTS"]) if away_line["PTS"] else None,
+                    "season":     str(game["SEASON"])
                 })
         except Exception as e:
             logger.error(f"Failed to fetch games for {date}: {e}")
