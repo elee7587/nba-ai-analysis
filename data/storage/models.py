@@ -11,14 +11,14 @@ Base = declarative_base()
 class Game(Base):
     __tablename__ = "games"
 
-    game_id      = Column(String, primary_key=True)  # unique ID from NBA API
-    game_date    = Column(DateTime)                   # date of the game
-    home_team    = Column(String)                     # home team abbreviation
-    away_team    = Column(String)                     # away team abbreviation
-    home_score   = Column(Integer)                    # final home score
-    away_score   = Column(Integer)                    # final away score
-    season       = Column(String)                     # e.g. "2024-25"
-    created_at   = Column(DateTime, default=datetime.utcnow)  # when we stored it
+    game_id    = Column(String, primary_key=True)
+    game_date  = Column(DateTime)              # was "date"
+    home_team  = Column(String)                # was "home_team_id"
+    away_team  = Column(String)                # was "away_team_id"
+    home_score = Column(Integer)
+    away_score = Column(Integer)
+    season     = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     # These let you navigate between tables easily
     boxscore_players  = relationship("BoxScore_Player", backref="game")
@@ -30,8 +30,9 @@ class Game(Base):
 class BoxScore_Player(Base):
     __tablename__ = "box_scores_players"
 
-    game_id = Column(String, ForeignKey("games.game_id"), primary_key=True)  # link to Game
-    team_id = Column(String, primary_key=True)  # team abbreviation
+    game_id   = Column(String, ForeignKey("games.game_id"), primary_key=True)
+    player_id = Column(String, primary_key=True)  # was team_id
+    team_id   = Column(String)  # team ID
     team_abbrev = Column(String)  # team abbreviation
     team_city = Column(String)    # team city
     player_id = Column(String)  # player ID from NBA API
@@ -94,14 +95,14 @@ class BoxScore_Team(Base):
 class PlayByPlay(Base):
     __tablename__ = "play_by_play"
 
-    id              = Column(Integer, primary_key=True, autoincrement=True)  # auto generated ID
-    game_id         = Column(String, ForeignKey("games.game_id"))            # link to Game
+    game_id      = Column(String, ForeignKey("games.game_id"), primary_key=True)
+    action_id    = Column(Integer, primary_key=True)  # unique per play
     period          = Column(Integer)    # quarter number (1-4, 5+ for OT)
     clock           = Column(String)     # time remaining in period (e.g. "5:32")
     home_score      = Column(Integer)    # running home score at this moment
     away_score      = Column(Integer)    # running away score at this moment
     score_margin    = Column(Integer)    # home - away at this moment
-    event_type      = Column(Integer)    # type of event (score, foul, timeout etc)
+    event_type      = Column(String)     # type of event (score, foul, timeout etc)
     description     = Column(Text)       # human readable description of the play
     player_id       = Column(String)     # player involved in the play
     player_name     = Column(String)     # player name
@@ -126,7 +127,7 @@ class AdvancedBoxScorePlayer(Base):
     game_id                         = Column(String, ForeignKey("games.game_id"))
     team_id                         = Column(String)
     team_tricode                    = Column(String)
-    person_id                       = Column(String)
+    player_id                       = Column(String)
     player_name                     = Column(String)
     minutes                         = Column(String)
     estimated_offensive_rating      = Column(Float)
@@ -135,16 +136,16 @@ class AdvancedBoxScorePlayer(Base):
     defensive_rating                = Column(Float)
     estimated_net_rating            = Column(Float)
     net_rating                      = Column(Float)
-    assist_percentage               = Column(Float)
+    assist_percentage = Column(Float)  # was assist_pct
+    rebound_percentage = Column(Float)  # was rebound_pct
     assist_to_turnover              = Column(Float)
     assist_ratio                    = Column(Float)
     offensive_rebound_pct           = Column(Float)
     defensive_rebound_pct           = Column(Float)
-    rebound_percentage              = Column(Float)
     turnover_ratio                  = Column(Float)
     effective_fg_pct                = Column(Float)
     true_shooting_pct               = Column(Float)
-    usage_percentage                = Column(Float)
+    usage_pct                       = Column(Float)
     estimated_usage_pct             = Column(Float)
     estimated_pace                  = Column(Float)
     pace                            = Column(Float)

@@ -187,10 +187,11 @@ class GameProcessor:
             for _, row in pbp_data.iterrows():
                 session.merge(PlayByPlay(
                     game_id     = game_id,
+                    action_id = row['actionId'],
                     period      = row['period'],
                     clock       = row['clock'],
-                    home_score  = row['scoreHome'],
-                    away_score  = row['scoreAway'],
+                    home_score   = int(row['scoreHome']) if row['scoreHome'] != '' else None,
+                    away_score   = int(row['scoreAway']) if row['scoreAway'] != '' else None,
                     score_margin = int(row['scoreHome']) - int(row['scoreAway']) if row['scoreHome'] and row['scoreAway'] else None,
                     event_type  = row['actionType'],
                     description = row['description'],
