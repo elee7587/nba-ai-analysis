@@ -15,13 +15,16 @@ class GameProcessor:
 
     def process_date(self, date: str):
         games = self.game_collector.get_games_by_date(date)
+        if not games:
+            logger.info(f"No games found for {date}, skipping.")
+            return
         for game in games:
             session = SessionLocal()
             try:
                 game_record = Game(
                     game_id    = game['game_id'],
                     season     = game['season'],
-                    game_date = datetime.strptime(game['game_date'], "%Y-%m-%dT%H:%M:%S"),
+                    game_date = datetime.strptime(game['game_date'].replace('Z', ''), "%Y-%m-%dT%H:%M:%S"),
                     home_team  = game['home_team'],
                     away_team  = game['away_team'],
                     home_score = game['home_score'],
@@ -46,7 +49,7 @@ class GameProcessor:
             for _, row in boxscore_data["player_stats"].iterrows():
                 session.merge(BoxScore_Player(
                     game_id        = game_id,
-                    team_id        = row['teamId'],
+                    team_id        = str(int(row['teamId'])),
                     team_abbrev    = row['teamTricode'],
                     team_city      = row['teamCity'],
                     player_id      = row['personId'],
@@ -81,7 +84,7 @@ class GameProcessor:
             for _, row in boxscore_data["team_stats"].iterrows():
                 session.merge(BoxScore_Team(
                     game_id   = game_id,
-                    team_id   = row['teamId'],
+                    team_id   = str(int(row['teamId'])),
                     team_abbrev = row['teamTricode'],
                     team_city = row['teamCity'],
                     minutes   = row['minutes'],
@@ -111,9 +114,9 @@ class GameProcessor:
             for _, row in boxscore_data["advanced_player_stats"].iterrows():
                 session.merge(AdvancedBoxScorePlayer(
                     game_id                    = game_id,
-                    team_id                    = row['teamId'],
+                    team_id                    = str(int(row['teamId'])),
                     team_tricode               = row['teamTricode'],
-                    person_id                  = row['personId'],
+                    player_id                  = str(int(row['personId'])),
                     player_name                = row['firstName'] + ' ' + row['familyName'],
                     minutes                    = row['minutes'],
                     estimated_offensive_rating = row['estimatedOffensiveRating'],
@@ -131,7 +134,7 @@ class GameProcessor:
                     turnover_ratio             = row['turnoverRatio'],
                     effective_fg_pct           = row['effectiveFieldGoalPercentage'],
                     true_shooting_pct          = row['trueShootingPercentage'],
-                    usage_percentage           = row['usagePercentage'],
+                    usage_pct                  = row['usagePercentage'],
                     estimated_usage_pct        = row['estimatedUsagePercentage'],
                     estimated_pace             = row['estimatedPace'],
                     pace                       = row['pace'],
@@ -145,7 +148,7 @@ class GameProcessor:
             for _, row in boxscore_data["advanced_team_stats"].iterrows():
                 session.merge(AdvancedBoxScoreTeam(
                     game_id                    = game_id,
-                    team_id                    = row['teamId'],
+                    team_id                    = str(int(row['teamId'])),
                     team_tricode               = row['teamTricode'],
                     minutes                    = row['minutes'],
                     estimated_offensive_rating = row['estimatedOffensiveRating'],
