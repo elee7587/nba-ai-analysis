@@ -52,7 +52,7 @@ class GameProcessor:
                     team_id        = str(int(row['teamId'])),
                     team_abbrev    = row['teamTricode'],
                     team_city      = row['teamCity'],
-                    player_id      = row['personId'],
+                    player_id      = str(int(row['personId'])),
                     player_name    = row['firstName'] + ' ' + row['familyName'],
                     nickname       = row['nameI'],
                     start_position = row['position'],

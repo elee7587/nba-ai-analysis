@@ -35,7 +35,6 @@ class BoxScore_Player(Base):
     team_id   = Column(String)  # team ID
     team_abbrev = Column(String)  # team abbreviation
     team_city = Column(String)    # team city
-    player_id = Column(String)  # player ID from NBA API
     player_name = Column(String)  # player name
     nickname = Column(String)  # player nickname
     start_position = Column(String)  # starting position (e.g. "Guard")
