@@ -4,13 +4,14 @@ from data.storage.models import (
     PlayByPlay, BoxScore_Player, BoxScore_Team,
     AdvancedBoxScorePlayer, SeasonPlayerStats, SeasonTeamStats
 )
-
+EXCLUDE_EVENT_TYPES = {'Timeout'}
 def get_play_by_play(game_id: str) -> list:
     # query play_by_play ordered by action_id
     session = SessionLocal()
     try:
         plays = session.query(PlayByPlay)\
             .filter(PlayByPlay.game_id == game_id)\
+            .filter(~PlayByPlay.event_type.in_(EXCLUDE_EVENT_TYPES))\
             .order_by(PlayByPlay.action_id)\
             .all()
         return [{
