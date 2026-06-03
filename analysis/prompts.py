@@ -139,6 +139,8 @@ Your response must follow this exact structure:
 
 Here is the game data:
 
+PLAY BY PLAY:
+{play_by_play}
 
 TEAM STATS VS SEASON AVERAGES:
 {team_comparison}
