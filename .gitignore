@@ -1,0 +1,19 @@
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+*.egg-info/
+
+# Database
+*.db
+*.sqlite
+
+# Logs
+*.log
+
+# VS Code
+.vscode/
