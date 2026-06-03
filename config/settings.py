@@ -17,7 +17,6 @@ DATABASE_URL = (
     f"@{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}"
 )
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 # nba_api rate limiting — be respectful
 REQUEST_TIMEOUT = 30
