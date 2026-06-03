@@ -5,6 +5,43 @@ from data.storage.models import (
     AdvancedBoxScorePlayer, SeasonPlayerStats, SeasonTeamStats
 )
 EXCLUDE_EVENT_TYPES = {'Timeout'}
+
+def get_play_by_play_by_period(game_id: str) -> dict:
+    """Returns play by play grouped by period"""
+    session = SessionLocal()
+    try:
+        plays = session.query(PlayByPlay)\
+            .filter(PlayByPlay.game_id == game_id)\
+            .filter(~PlayByPlay.event_type.in_(['Timeout']))\
+            .order_by(PlayByPlay.action_id)\
+            .all()
+
+        # group by period
+        periods = {}
+        for p in plays:
+            period = p.period
+            if period not in periods:
+                periods[period] = []
+            periods[period].append({
+                "action_id":    p.action_id,
+                "period":       p.period,
+                "clock":        p.clock,
+                "home_score":   p.home_score,
+                "away_score":   p.away_score,
+                "score_margin": p.score_margin,
+                "event_type":   p.event_type,
+                "description":  p.description,
+                "player_name":  p.player_name,
+                "team":         p.team
+            })
+
+        return periods
+    except Exception as e:
+        print(f"Failed to get play by play by period for game {game_id}: {e}")
+        raise
+    finally:
+        session.close()
+
 def get_play_by_play(game_id: str) -> list:
     # query play_by_play ordered by action_id
     session = SessionLocal()

@@ -1,5 +1,50 @@
 # analysis/prompts.py
 
+QUARTER_ANALYST_PROMPT = """
+You are an expert NBA data analyst. Your task is to analyze the play by play data 
+for a single quarter and identify scoring runs and momentum shifts.
+
+A scoring run is when one team scores multiple consecutive points without the other team scoring.
+A momentum shift is a key moment that changed the flow of the quarter — a big defensive stop, 
+a clutch shot, a turning point play.
+
+Identify ALL significant runs and momentum shifts in this quarter. Be specific about 
+the clock time, the players involved, and the score margin at the time.
+
+You must respond in valid JSON only. No preamble. No markdown. No explanation outside the JSON.
+
+Your response must follow this exact structure:
+{{
+    "period": {period},
+    "scoring_runs": [
+        {{
+            "team": "team tricode",
+            "run_size": "number of unanswered points",
+            "start_clock": "clock time when run started",
+            "end_clock": "clock time when run ended",
+            "start_margin": "score margin at start",
+            "end_margin": "score margin at end",
+            "description": "brief description of how the run happened",
+            "key_players": ["players involved"]
+        }}
+    ],
+    "momentum_shifts": [
+        {{
+            "clock": "clock time",
+            "team_that_gained": "team tricode",
+            "trigger_event": "the play that caused the shift",
+            "score_margin_before": "margin before the shift",
+            "score_margin_after": "margin after the shift",
+            "description": "brief description of the momentum shift",
+            "key_players": ["players involved"]
+        }}
+    ]
+}}
+
+Here is the quarter {period} play by play data:
+{play_by_play}
+"""
+
 ANALYST_PROMPT = """
 You are an expert NBA data analyst with an extensive background in basketball analytics and a deep understanding of the game.
 Your task is to analyze raw game data and identify key insights. Your analysis will be used by content writers to create 
@@ -27,28 +72,28 @@ clutch moments, advanced metrics like net rating, true shooting percentage, PIE,
 You must respond in valid JSON only. No preamble. No markdown. No explanation outside the JSON.
 
 Your response must follow this exact structure:
-{
+{{
     "scoring_runs": [
-        {
+        {{
             "team": "team tricode",
             "run_size": "number of unanswered points",
             "period": "quarter number",
             "start_clock": "clock time when run started",
             "end_clock": "clock time when run ended",
             "description": "brief description of how the run happened"
-        }
+        }}
     ],
     "momentum_shifts": [
-        {
+        {{
             "period": "quarter number",
             "clock": "clock time",
             "team_that_gained": "team tricode",
             "trigger_event": "the play that caused the shift",
             "description": "brief description of the momentum shift"
-        }
+        }}
     ],
     "team_outliers": [
-        {
+        {{
             "team": "team tricode",
             "stat": "stat name",
             "game_value": "value in this game",
@@ -57,10 +102,10 @@ Your response must follow this exact structure:
             "deviation": "how much above or below average",
             "direction": "above or below",
             "significance": "brief explanation of why this matters"
-        }
+        }}
     ],
     "player_outliers": [
-        {
+        {{
             "player": "player name",
             "team": "team tricode",
             "stat": "stat name",
@@ -70,14 +115,14 @@ Your response must follow this exact structure:
             "deviation": "how much above or below average",
             "direction": "above or below",
             "significance": "brief explanation of why this matters"
-        }
+        }}
     ],
     "mvp_candidates": [
-        {
+        {{
             "player": "player name",
             "team": "team tricode",
             "rank": "1, 2, or 3 within their team",
-            "key_stats": {
+            "key_stats": {{
                 "points": 0,
                 "rebounds": 0,
                 "assists": 0,
@@ -85,17 +130,15 @@ Your response must follow this exact structure:
                 "true_shooting_pct": 0,
                 "net_rating": 0,
                 "pie": 0
-            },
+            }},
             "key_moments": ["list of key moments that defined their game"],
             "reasoning": "detailed explanation of why this player deserves MVP consideration"
-        }
+        }}
     ]
-}
+}}
 
 Here is the game data:
 
-PLAY BY PLAY:
-{play_by_play}
 
 TEAM STATS VS SEASON AVERAGES:
 {team_comparison}
@@ -121,14 +164,14 @@ You must respond in valid JSON only. No preamble. No markdown. No explanation ou
 
 Your response must follow this exact structure:
 [
-    {
+    {{
         "type": "scoring_run or momentum_shift",
         "team": "team tricode",
         "period": "quarter number",
         "description": "a concise description of what happened",
         "key_players": ["list of key players involved"],
         "analysis": "deep analytical explanation of why this moment mattered and how it impacted the game"
-    }
+    }}
 ]
 
 Here is the data:
@@ -155,7 +198,7 @@ You must respond in valid JSON only. No preamble. No markdown. No explanation ou
 
 Your response must follow this exact structure:
 [
-    {
+    {{
         "type": "team or player",
         "subject": "team tricode or player name",
         "stat": "the outlier stat",
@@ -164,7 +207,7 @@ Your response must follow this exact structure:
         "description": "a concise description of the outlier",
         "key_players": ["list of key players involved if applicable"],
         "analysis": "deep analytical explanation of why this outlier mattered and how it impacted the game"
-    }
+    }}
 ]
 
 Here is the data:
@@ -196,20 +239,20 @@ You must respond in valid JSON only. No preamble. No markdown. No explanation ou
 
 Your response must follow this exact structure:
 [
-    {
+    {{
         "player": "player name",
         "team": "team tricode",
         "rank": "1, 2, or 3 within their team",
         "description": "a concise description of their overall performance",
         "key_moments": ["list of key moments that defined their impact"],
-        "advanced_metrics": {
+        "advanced_metrics": {{
             "true_shooting_pct": 0,
             "net_rating": 0,
             "pie": 0,
             "plus_minus": 0
-        },
+        }},
         "analysis": "deep analytical explanation of why this player was the most impactful and deserving of MVP recognition"
-    }
+    }}
 ]
 
 Here is the data:
@@ -241,20 +284,20 @@ Your story should:
 You must respond in valid JSON only. No preamble. No markdown. No explanation outside the JSON.
 
 Your response must follow this exact structure:
-{
+{{
     "hook": "An opening line that captures the drama and significance of the game",
     "scoring_narrative": "A flowing narrative of how the scoring runs and momentum shifts defined the game",
     "statistical_story": "A narrative explaining the key statistical outliers and how they shaped the outcome",
-    "mvp_home": {
+    "mvp_home": {{
         "player": "player name",
         "narrative": "MVP narrative for the home team player"
-    },
-    "mvp_away": {
+    }},
+    "mvp_away": {{
         "player": "player name",
         "narrative": "MVP narrative for the away team player"
-    },
+    }},
     "closing": "A closing line that summarizes the game and its significance"
-}
+}}
 
 Here is the data:
 
