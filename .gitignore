@@ -17,3 +17,6 @@ venv/
 
 # VS Code
 .vscode/
+
+# ChromaDB
+./chroma_db

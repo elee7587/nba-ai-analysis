@@ -16,10 +16,9 @@ from analysis.queries import (
     get_player_comparison,
     get_mvp_data
 )
-from config.settings import GROQ_API_KEY
 from loguru import logger
 
-ANALYST_MODEL = "qwen22.5:72b"
+ANALYST_MODEL = "qwen2.5:72b"
 WRITER_MODEL = "mistral:7b"
 class NBAAnalysisAgent:
 
