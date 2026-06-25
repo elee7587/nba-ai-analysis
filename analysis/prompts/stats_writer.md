@@ -35,4 +35,4 @@ ANALYST FINDINGS - PLAYER OUTLIERS:
 {player_outliers}
 
 PLAYER STATS VS SEASON AVERAGES:
-{player_comparison}
+{player_comparison} 
