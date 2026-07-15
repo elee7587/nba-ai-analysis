@@ -1,6 +1,10 @@
 # analysis/agent.py
 import json
 import ollama
+import os
+from pathlib import Path
+from analysis.vector_store import NBAVectorStore
+
 from analysis.prompts import (
     SCORING_ANALYST_PROMPT,
     TEAM_STATS_ANALYST_PROMPT,
@@ -20,19 +24,25 @@ from analysis.queries import (
 )
 from loguru import logger
 
+# Define models for different stages of analysis and writing
 REASONING_MODEL  = "qwen2.5:32b"  # deep analysis and writing
 FORMATTING_MODEL = "qwen2.5:14b"  # structured JSON output
 WRITER_MODEL     = "qwen2.5:32b"  # narratives need good reasoning
 EDITOR_MODEL     = "qwen2.5:32b"  # final polish needs good reasoning
+
+# Output directory for narratives
+OUTPUT_RAW_DIR = Path("output/raw-findings")
+
 class NBAAnalysisAgent:
 
     def __init__(self, game_id: str):
-        self.game_id           = game_id
-        self.play_by_play      = None
+        self.game_id                = game_id
+        self.play_by_play           = None
         self.play_by_play_by_period = None
-        self.team_comparison   = None
-        self.player_comparison = None
-        self.mvp_data          = None
+        self.team_comparison        = None
+        self.player_comparison      = None
+        self.mvp_data               = None
+        self.vector_store           = NBAVectorStore()  # to be initialized later if needed
 
     def load_data(self):
         """Load all game data from the database"""
@@ -75,6 +85,14 @@ class NBAAnalysisAgent:
         )
         return self._parse_json(raw, label)
 
+    def _save_output(self, filename: str, data: dict | list):
+        """Save output to file for review"""
+        OUTPUT_RAW_DIR.mkdir(parents=True, exist_ok=True)
+        filepath = OUTPUT_RAW_DIR / filename
+        with open(filepath, 'w') as f:
+            json.dump(data, f, indent=2, default=str)
+        logger.info(f"Saved output to {filepath}")
+
     def _call_llm(self, prompt: str, label: str, model: str, force_json: bool = False, retries: int = 3) -> str:
         """Single reusable method for all LLM calls"""
         system_content = (
@@ -99,7 +117,8 @@ class NBAAnalysisAgent:
                 ],
                 options={
                     "temperature": 0.1 if force_json else 0.3,
-                    "num_predict": 16000
+                    "num_predict": 16000,
+                    "num_ctx": 32768  # increase context window
                 }
             )
             raw = response['message']['content']
@@ -120,89 +139,104 @@ class NBAAnalysisAgent:
         """Parse JSON with error handling and repair attempt"""
         try:
             return json.loads(raw)
-        except json.JSONDecodeError as e:
+        except json.JSONDecodeError:
             logger.warning(f"JSON parse failed for {label}, attempting repair...")
-            
-            # attempt to fix truncated JSON by closing open brackets
-            repaired = raw
-            open_braces   = raw.count('{') - raw.count('}')
-            open_brackets = raw.count('[') - raw.count(']')
-            
-            # close any open strings first
-            if repaired.count('"') % 2 != 0:
-                repaired += '"'
-            
-            # close open brackets and braces
-            repaired += ']' * open_brackets
-            repaired += '}' * open_braces
-            
             try:
+                from json_repair import repair_json
+                repaired = repair_json(raw)
                 result = json.loads(repaired)
                 logger.info(f"JSON repair successful for {label}")
                 return result
-            except json.JSONDecodeError:
+            except Exception as e:
                 logger.error(f"JSON repair failed for {label}: {e}")
                 logger.error(f"Raw response: {raw[:500]}")
                 raise
 
-    def run_scoring_analyst(self) -> dict:
-        """Analyst 1 — scoring runs and momentum shifts"""
-        schema = """
-        {
-            "scoring_runs": [{"team": "", "run_size": "", "period": "", "start_clock": "", "end_clock": "", "description": "", "key_players": []}],
-            "momentum_shifts": [{"period": "", "clock": "", "team_that_gained": "", "trigger_event": "", "score_margin_before": "", "score_margin_after": "", "description": "", "key_players": []}]
-        }
-        """
+    def run_scoring_analyst(self, corrections: dict = None) -> dict:
+        schema = """..."""
+        
+        correction_context = ""
+        if corrections and corrections.get("scoring_runs"):
+            correction_context = f"""
+    IMPORTANT — Previous corrections from human reviewer:
+    {json.dumps(corrections.get('scoring_runs'), indent=2)}
+    Use these corrections to improve your analysis.
+    """
+        
         prompt = SCORING_ANALYST_PROMPT.format(
             play_by_play=json.dumps(self.play_by_play, indent=2, default=str)
-        )
-        return self._call_with_reasoning(prompt, "scoring_analyst", schema)
+        ) + correction_context
 
-    def run_team_stats_analyst(self) -> dict:
-        """Analyst 2 — team level outliers"""
-        schema = """
-        {
-            "team_outliers": [{"team": "", "stat": "", "game_value": "", "season_average": "", "season_rank": "", "deviation": "", "direction": "", "significance": ""}]
-        }
-        """
+        findings = self._call_with_reasoning(prompt, "scoring_analyst", schema)
+        self._save_output(f"scoring_analyst_{self.game_id}.json", findings)
+        return findings
+    
+    def run_team_stats_analyst(self, corrections: dict = None) -> dict:
+        schema = """..."""
+        
+        correction_context = ""
+        if corrections and corrections.get("scoring_runs"):
+            correction_context = f"""
+    IMPORTANT — Previous corrections from human reviewer:
+    {json.dumps(corrections.get('scoring_runs'), indent=2)}
+    Use these corrections to improve your analysis.
+    """
+            
         prompt = TEAM_STATS_ANALYST_PROMPT.format(
             team_comparison=json.dumps(self.team_comparison, indent=2, default=str)
-        )
-        return self._call_with_reasoning(prompt, "team_stats_analyst", schema)
+        ) + correction_context
+        findings = self._call_with_reasoning(prompt, "team_stats_analyst", schema)
+        self._save_output(f"team_stats_analyst_{self.game_id}.json", findings)
+        return findings
 
-    def run_player_stats_analyst(self) -> dict:
+    def run_player_stats_analyst(self, corrections: dict = None) -> dict:
         """Analyst 3 — player level outliers"""
-        schema = """
-        {
-            "player_outliers": [{"player": "", "team": "", "stat": "", "game_value": "", "season_average": "", "season_rank": "", "deviation": "", "direction": "", "significance": ""}]
-        }
-        """
+        schema = """..."""
+        correction_context = ""
+        if corrections and corrections.get("scoring_runs"):
+            correction_context = f"""
+    IMPORTANT — Previous corrections from human reviewer:
+    {json.dumps(corrections.get('scoring_runs'), indent=2)}
+    Use these corrections to improve your analysis.
+    """
         prompt = PLAYER_STATS_ANALYST_PROMPT.format(
             player_comparison=json.dumps(self.player_comparison, indent=2, default=str)
-        )
-        return self._call_with_reasoning(prompt, "player_stats_analyst", schema)
+        ) + correction_context
+        findings = self._call_with_reasoning(prompt, "player_stats_analyst", schema)
+        self._save_output(f"player_stats_analyst_{self.game_id}.json", findings)
+        return findings
 
-    def run_mvp_analyst(self) -> dict:
+    def run_mvp_analyst(self, corrections: dict = None) -> dict:
         """Analyst 4 — MVP candidates"""
-        schema = """
-        {
-            "mvp_candidates": [{"player": "", "team": "", "rank": "", "key_stats": {"points": 0, "rebounds": 0, "assists": 0, "plus_minus": 0, "true_shooting_pct": 0, "net_rating": 0, "pie": 0}, "key_moments": [], "reasoning": ""}]
-        }
-        """
+        schema = """..."""
+        correction_context = ""
+        if corrections and corrections.get("scoring_runs"):
+            correction_context = f"""
+    IMPORTANT — Previous corrections from human reviewer:
+    {json.dumps(corrections.get('scoring_runs'), indent=2)}
+    Use these corrections to improve your analysis.
+    """
         prompt = MVP_ANALYST_PROMPT.format(
             player_comparison=json.dumps(self.player_comparison, indent=2, default=str),
             mvp_data=json.dumps(self.mvp_data, indent=2, default=str)
-        )
-        return self._call_with_reasoning(prompt, "mvp_analyst", schema)
+        ) + correction_context
+        findings = self._call_with_reasoning(prompt, "mvp_analyst", schema)
+        self._save_output(f"mvp_analyst_{self.game_id}.json", findings)
+        return findings
 
     def run_analyst(self) -> dict:
         """Run all four analysts and combine findings"""
         logger.info(f"Running analyst chain for game {self.game_id}")
 
-        scoring   = self.run_scoring_analyst()
-        team      = self.run_team_stats_analyst()
-        player    = self.run_player_stats_analyst()
-        mvp       = self.run_mvp_analyst()
+        # pull any existing corrections to use as context
+        corrections = self.vector_store.get_corrections(self.game_id)
+        if corrections:
+            logger.info(f"Found existing corrections for game {self.game_id} — using as context")
+
+        scoring = self.run_scoring_analyst(corrections=corrections)
+        team    = self.run_team_stats_analyst(corrections=corrections)
+        player  = self.run_player_stats_analyst(corrections=corrections)
+        mvp     = self.run_mvp_analyst(corrections=corrections)
 
         findings = {
             "scoring_runs":    scoring.get("scoring_runs", []),
@@ -211,6 +245,10 @@ class NBAAnalysisAgent:
             "player_outliers": player.get("player_outliers", []),
             "mvp_candidates":  mvp.get("mvp_candidates", [])
         }
+
+        # store findings in vector store
+        self.vector_store.store_analysis(self.game_id, findings)
+        self._save_output(f"full_analyst_{self.game_id}.json", findings)
 
         logger.info(
             f"Analyst chain complete — "

@@ -24,31 +24,43 @@ class NBAVectorStore:
 
     def store_analysis(self, game_id: str, findings: dict):
         # store analyst findings
-        self.analysis_collection.add(
+        self.analysis_collection.upsert(
             documents=[json.dumps(findings)],
-            metadatas=[{"game_id": game_id, "timestamp": datetime.utcnow()}],
+            metadatas=[{"game_id": game_id, "timestamp": str(datetime.utcnow())}],
             ids=[f"analysis_{game_id}"]
         )
 
     def store_correction(self, game_id: str, correction: dict):
         # store human correction
-        self.corrected_collection.add(
+        self.corrected_collection.upsert(
             documents=[json.dumps(correction)],
-            metadatas=[{"game_id": game_id, "timestamp": datetime.utcnow()}],
+            metadatas=[{"game_id": game_id, "timestamp": str(datetime.utcnow())}],
             ids=[f"correction_{game_id}"]
         )
 
     def store_narrative(self, game_id: str, narrative: dict):
         # store final narrative
-        self.narrative_collection.add(
+        self.narrative_collection.upsert(
             documents=[json.dumps(narrative)],
-            metadatas=[{"game_id": game_id, "timestamp": datetime.utcnow()}],
+            metadatas=[{"game_id": game_id, "timestamp": str(datetime.utcnow())}],
             ids=[f"narrative_{game_id}"]
         )
 
     def get_similar_games(self, query: str, n_results: int = 3) -> list:
-        # query for similar past analyses
         results = self.analysis_collection.query(
             query_texts=[query],
             n_results=n_results
-        )  
+        )
+        return results['documents'][0] if results['documents'] else []
+    
+    def get_corrections(self, game_id: str) -> dict | None:
+        """Retrieve corrections for a specific game if they exist"""
+        try:
+            result = self.corrected_collection.get(
+                ids=[f"correction_{game_id}"]
+            )
+            if result['documents']:
+                return json.loads(result['documents'][0])
+            return None
+        except Exception:
+            return None

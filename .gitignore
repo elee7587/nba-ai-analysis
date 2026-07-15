@@ -20,3 +20,6 @@ venv/
 
 # ChromaDB
 ./chroma_db
+
+# Output
+output/
