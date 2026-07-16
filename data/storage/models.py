@@ -242,3 +242,12 @@ class SeasonPlayerStats(Base):
     dd2               = Column(Integer)
     td3               = Column(Integer)
     last_updated      = Column(DateTime)
+
+class GameOutcome(Base):
+    __tablename__ = "game_outcomes"
+
+    game_id      = Column(String, ForeignKey("games.game_id"), primary_key=True)
+    home_team_id = Column(String)
+    home_won     = Column(Integer)  # 1 = home won, 0 = home lost
+    season       = Column(String)
+    created_at   = Column(DateTime, default=datetime.utcnow)
