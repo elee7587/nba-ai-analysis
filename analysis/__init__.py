@@ -1,7 +1,8 @@
 import json
 import ollama
 from analysis.prompts import (
-    ANALYST_PROMPT,
+    QUARTER_ANALYST_PROMPT,
+    GAME_ANALYST_PROMPT,
     SCORING_WRITER_PROMPT,
     STATS_WRITER_PROMPT,
     MVP_WRITER_PROMPT,

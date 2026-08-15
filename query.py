@@ -34,7 +34,4 @@ def run_query(sql: str):
 
 # put your queries here
 if __name__ == "__main__":
-    run_query("SELECT * FROM games;")
-    run_query("SELECT COUNT(*) FROM box_scores_players;")
-    run_query("SELECT COUNT(*) FROM play_by_play;")
-    run_query("SELECT COUNT(*) FROM advanced_boxscore_players;")
+    run_query("SELECT COUNT(*) FROM game_outcomes;")

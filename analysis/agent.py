@@ -6,7 +6,9 @@ from pathlib import Path
 from analysis.vector_store import NBAVectorStore
 
 from analysis.prompts import (
-    SCORING_ANALYST_PROMPT,
+    GAME_ANALYST_PROMPT,
+    QUARTER_ANALYST_PROMPT,
+    #SCORING_ANALYST_PROMPT,
     TEAM_STATS_ANALYST_PROMPT,
     PLAYER_STATS_ANALYST_PROMPT,
     MVP_ANALYST_PROMPT,
