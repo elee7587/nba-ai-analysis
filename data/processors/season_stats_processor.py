@@ -20,14 +20,13 @@ class SeasonStatsProcessor:
         season  = self.get_current_season()
         session = SessionLocal()
 
-        # check cache
-        existing = session.query(SeasonTeamStats).filter_by(season=season).first()
-        if existing and existing.last_updated.date() == datetime.today().date():
-            logger.info(f"Season stats for {season} are up to date, skipping.")
-            session.close()
-            return
-
         try:
+            # check cache
+            existing = session.query(SeasonTeamStats).filter_by(season=season).first()
+            if existing and existing.last_updated and existing.last_updated.date() == datetime.today().date():
+                logger.info(f"Season stats for {season} are up to date, skipping.")
+                return
+
             season_stats = self.season_stats_collector.get_season_stats(szn=season)
             team_stats   = season_stats["team_stats"]
             player_stats = season_stats["player_stats"]

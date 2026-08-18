@@ -11,7 +11,7 @@ GAME_ANALYST_PROMPT    = load_prompt("game_analyst")
 QUARTER_ANALYST_PROMPT = load_prompt("quarter_analyst")
 
 # Stats prompts
-#SCORING_ANALYST_PROMPT      = load_prompt("scoring_analyst")
+SCORING_ANALYST_PROMPT      = load_prompt("scoring_analyst")
 TEAM_STATS_ANALYST_PROMPT   = load_prompt("team_stats_analyst")
 PLAYER_STATS_ANALYST_PROMPT = load_prompt("player_stats_analyst")
 MVP_ANALYST_PROMPT          = load_prompt("mvp_analyst")

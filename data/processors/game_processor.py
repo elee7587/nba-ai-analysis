@@ -5,6 +5,15 @@ from data.storage.db import SessionLocal
 from data.storage.models import Game, BoxScore_Player, BoxScore_Team, AdvancedBoxScorePlayer, AdvancedBoxScoreTeam, PlayByPlay
 from loguru import logger
 from datetime import datetime
+import pandas as pd
+
+
+def _parse_score(value):
+    """Coerce a raw scoreHome/scoreAway cell to int, treating None/NaN/'' as missing."""
+    if value is None or value == '' or (isinstance(value, float) and pd.isna(value)):
+        return None
+    return int(value)
+
 
 class GameProcessor:
 
@@ -188,14 +197,16 @@ class GameProcessor:
         session = SessionLocal()
         try:
             for _, row in pbp_data.iterrows():
+                home_score = _parse_score(row['scoreHome'])
+                away_score = _parse_score(row['scoreAway'])
                 session.merge(PlayByPlay(
                     game_id     = game_id,
                     action_id = row['actionId'],
                     period      = row['period'],
                     clock       = row['clock'],
-                    home_score   = int(row['scoreHome']) if row['scoreHome'] != '' else None,
-                    away_score   = int(row['scoreAway']) if row['scoreAway'] != '' else None,
-                    score_margin = int(row['scoreHome']) - int(row['scoreAway']) if row['scoreHome'] and row['scoreAway'] else None,
+                    home_score   = home_score,
+                    away_score   = away_score,
+                    score_margin = (home_score - away_score) if home_score is not None and away_score is not None else None,
                     event_type  = row['actionType'],
                     description = row['description'],
                     player_id   = row['personId'],

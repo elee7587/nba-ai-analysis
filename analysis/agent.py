@@ -8,7 +8,7 @@ from analysis.vector_store import NBAVectorStore
 from analysis.prompts import (
     GAME_ANALYST_PROMPT,
     QUARTER_ANALYST_PROMPT,
-    #SCORING_ANALYST_PROMPT,
+    SCORING_ANALYST_PROMPT,
     TEAM_STATS_ANALYST_PROMPT,
     PLAYER_STATS_ANALYST_PROMPT,
     MVP_ANALYST_PROMPT,
@@ -83,7 +83,8 @@ class NBAAnalysisAgent:
         raw = self._call_llm(
             prompt=format_prompt,
             label=f"{label}_formatting",
-            model=FORMATTING_MODEL
+            model=FORMATTING_MODEL,
+            force_json=True
         )
         return self._parse_json(raw, label)
 
@@ -155,8 +156,37 @@ class NBAAnalysisAgent:
                 raise
 
     def run_scoring_analyst(self, corrections: dict = None) -> dict:
-        schema = """..."""
-        
+        schema = """
+    {
+        "scoring_runs": [
+            {
+                "team": "team tricode",
+                "period": "period number the run occurred in, e.g. 3",
+                "run_size": "number of unanswered points",
+                "start_clock": "clock time when run started e.g. PT10M30.00S",
+                "end_clock": "clock time when run ended e.g. PT06M15.00S",
+                "start_score": "score when run started e.g. 62-58",
+                "end_score": "score when run ended e.g. 62-71",
+                "key_players": ["player names involved"],
+                "cause": "what caused the run — defense, offense, turnovers, transition etc",
+                "description": "2-3 sentence description of how the run unfolded"
+            }
+        ],
+        "momentum_shifts": [
+            {
+                "period": "period number the shift occurred in, e.g. 4",
+                "clock": "clock time of the shift",
+                "score": "score at this moment",
+                "team_that_gained": "team tricode",
+                "trigger_play": "specific play that caused the shift",
+                "key_players": ["players involved"],
+                "description": "2-3 sentence description of why this shifted momentum",
+                "impact": "how this affected the rest of the game"
+            }
+        ]
+    }
+    """
+
         correction_context = ""
         if corrections and corrections.get("scoring_runs"):
             correction_context = f"""
@@ -174,16 +204,31 @@ class NBAAnalysisAgent:
         return findings
     
     def run_team_stats_analyst(self, corrections: dict = None) -> dict:
-        schema = """..."""
-        
+        schema = """
+    {
+        "team_outliers": [
+            {
+                "team": "team tricode",
+                "stat": "name of the stat, e.g. field goal percentage",
+                "value": "the team's actual value for this stat in this game",
+                "season_average": "the team's season average for this stat",
+                "deviation_pct": "signed percent deviation from season average, e.g. -18.5",
+                "season_rank": "team's season rank in this stat",
+                "direction": "above or below",
+                "significance": "why this deviation was significant to the game outcome, and whether it helped or hurt their chances of winning"
+            }
+        ]
+    }
+    """
+
         correction_context = ""
-        if corrections and corrections.get("scoring_runs"):
+        if corrections and corrections.get("team_outliers"):
             correction_context = f"""
     IMPORTANT — Previous corrections from human reviewer:
-    {json.dumps(corrections.get('scoring_runs'), indent=2)}
+    {json.dumps(corrections.get('team_outliers'), indent=2)}
     Use these corrections to improve your analysis.
     """
-            
+
         prompt = TEAM_STATS_ANALYST_PROMPT.format(
             team_comparison=json.dumps(self.team_comparison, indent=2, default=str)
         ) + correction_context
@@ -193,12 +238,28 @@ class NBAAnalysisAgent:
 
     def run_player_stats_analyst(self, corrections: dict = None) -> dict:
         """Analyst 3 — player level outliers"""
-        schema = """..."""
+        schema = """
+    {
+        "player_outliers": [
+            {
+                "player": "player name",
+                "team": "team tricode",
+                "stat": "name of the stat, e.g. points",
+                "value": "the player's actual value for this stat in this game",
+                "season_average": "the player's season average for this stat",
+                "deviation_pct": "signed percent deviation from season average, e.g. 42.0",
+                "season_rank": "player's season rank in this stat, if applicable",
+                "direction": "above or below",
+                "significance": "why this deviation mattered to the game outcome"
+            }
+        ]
+    }
+    """
         correction_context = ""
-        if corrections and corrections.get("scoring_runs"):
+        if corrections and corrections.get("player_outliers"):
             correction_context = f"""
     IMPORTANT — Previous corrections from human reviewer:
-    {json.dumps(corrections.get('scoring_runs'), indent=2)}
+    {json.dumps(corrections.get('player_outliers'), indent=2)}
     Use these corrections to improve your analysis.
     """
         prompt = PLAYER_STATS_ANALYST_PROMPT.format(
@@ -210,12 +271,31 @@ class NBAAnalysisAgent:
 
     def run_mvp_analyst(self, corrections: dict = None) -> dict:
         """Analyst 4 — MVP candidates"""
-        schema = """..."""
+        schema = """
+    {
+        "mvp_candidates": [
+            {
+                "player": "player name",
+                "team": "team tricode",
+                "rank": "rank within their team, 1 being the top candidate",
+                "points": "points scored",
+                "rebounds": "total rebounds",
+                "assists": "assists",
+                "plus_minus": "plus/minus",
+                "net_rating": "net rating",
+                "true_shooting_pct": "true shooting percentage",
+                "pie": "player impact estimate",
+                "key_moments": ["specific moments that defined their impact"],
+                "reasoning": "detailed explanation of why they deserve MVP consideration"
+            }
+        ]
+    }
+    """
         correction_context = ""
-        if corrections and corrections.get("scoring_runs"):
+        if corrections and corrections.get("mvp_candidates"):
             correction_context = f"""
     IMPORTANT — Previous corrections from human reviewer:
-    {json.dumps(corrections.get('scoring_runs'), indent=2)}
+    {json.dumps(corrections.get('mvp_candidates'), indent=2)}
     Use these corrections to improve your analysis.
     """
         prompt = MVP_ANALYST_PROMPT.format(

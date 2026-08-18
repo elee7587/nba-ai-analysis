@@ -2,6 +2,7 @@
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
+
 from nba_api.stats.endpoints import leaguegamelog
 from data.processors.game_processor import GameProcessor
 from data.storage.db import SessionLocal
@@ -10,24 +11,27 @@ from loguru import logger
 import time
 import pandas as pd
 from datetime import datetime
-from data.storage.models import Game, GameOutcome
 
-def get_games_in_range(season: str, start_date: str, end_date: str) -> pd.DataFrame:
-    """Get all games within a date range"""
+
+def get_games_in_range(season: str, start_date: str, end_date: str, season_type: str = "Regular Season") -> pd.DataFrame:
+    """Get all games within a date range for a given season and season type"""
     time.sleep(2)
     log = leaguegamelog.LeagueGameLog(
         season=season,
-        season_type_all_star='Regular Season'
+        season_type_all_star=season_type
     )
     df = log.get_data_frames()[0]
     df['GAME_DATE'] = pd.to_datetime(df['GAME_DATE'])
     mask = (df['GAME_DATE'] >= start_date) & (df['GAME_DATE'] <= end_date)
-    return df[mask]
+    filtered = df[mask]
+    logger.info(f"Found {len(filtered['GAME_ID'].unique())} unique {season_type} games for {season}")
+    return filtered
+
 
 def get_home_team_result(game_rows: pd.DataFrame) -> dict | None:
     """
     Determine which team was home and whether they won
-    MATCHUP format: 'LAL vs. GSW' = home team, 'GSW @ LAL' = away team
+    MATCHUP format: 'LAL vs. GSW' = home, 'GSW @ LAL' = away
     """
     for _, row in game_rows.iterrows():
         if 'vs.' in row['MATCHUP']:
@@ -40,11 +44,11 @@ def get_home_team_result(game_rows: pd.DataFrame) -> dict | None:
             }
     return None
 
-def store_game_record(game_rows: pd.DataFrame, game_id: str):
-    """Store the game record in the games table first"""
+
+def store_game_record(game_rows: pd.DataFrame, game_id: str) -> bool:
+    """Store the game record in the games table first. Returns True on success."""
     session = SessionLocal()
     try:
-        # get home and away rows
         home_row = None
         away_row = None
         for _, row in game_rows.iterrows():
@@ -55,7 +59,7 @@ def store_game_record(game_rows: pd.DataFrame, game_id: str):
 
         if home_row is None or away_row is None:
             logger.warning(f"Could not determine home/away for {game_id}")
-            return
+            return False
 
         game = Game(
             game_id    = str(game_id),
@@ -69,15 +73,18 @@ def store_game_record(game_rows: pd.DataFrame, game_id: str):
         session.merge(game)
         session.commit()
         logger.info(f"Stored game record for {game_id}")
+        return True
 
     except Exception as e:
         session.rollback()
         logger.error(f"Failed to store game record for {game_id}: {e}")
+        return False
     finally:
         session.close()
 
+
 def store_game_outcome(result: dict):
-    """Store win/loss outcome for a game in the database"""
+    """Store win/loss outcome for a game"""
     session = SessionLocal()
     try:
         outcome = GameOutcome(
@@ -94,21 +101,30 @@ def store_game_outcome(result: dict):
     finally:
         session.close()
 
-def bulk_process(season: str, start_date: str, end_date: str, batch_size: int = 50, start_from: int = 0):
+
+def bulk_process(
+    season:      str,
+    start_date:  str,
+    end_date:    str,
+    batch_size:  int = 50,
+    start_from:  int = 0,
+    season_type: str = "Regular Season"
+):
     """
     Process games in a date range in batches
-    season:     NBA season string e.g. '2025-26'
-    start_date: 'YYYY-MM-DD'
-    end_date:   'YYYY-MM-DD'
-    batch_size: number of games per batch
-    start_from: index to resume from if interrupted
+    season:      NBA season string e.g. '2025-26'
+    start_date:  'YYYY-MM-DD'
+    end_date:    'YYYY-MM-DD'
+    batch_size:  number of games per batch before pause
+    start_from:  index to resume from if interrupted
+    season_type: 'Regular Season' or 'Playoffs'
     """
-    df = get_games_in_range(season, start_date, end_date)
+    df = get_games_in_range(season, start_date, end_date, season_type)
     unique_game_ids = df['GAME_ID'].unique().tolist()
 
     # apply start_from for resuming
     unique_game_ids = unique_game_ids[start_from:]
-    logger.info(f"Found {len(unique_game_ids)} games to process starting from index {start_from}")
+    logger.info(f"Processing {len(unique_game_ids)} {season_type} games starting from index {start_from}")
 
     processor    = GameProcessor()
     success      = 0
@@ -117,12 +133,13 @@ def bulk_process(season: str, start_date: str, end_date: str, batch_size: int = 
 
     for i, game_id in enumerate(unique_game_ids):
         try:
-            logger.info(f"Processing game {i + 1 + start_from}/{len(unique_game_ids) + start_from}: {game_id}")
+            logger.info(f"Processing game {i + 1 + start_from}/{len(unique_game_ids) + start_from}: {game_id} ({season_type})")
 
             game_rows = df[df['GAME_ID'] == game_id]
 
-            # step 1 — store game record first (required for foreign keys)
-            store_game_record(game_rows, game_id)
+            # step 1 — store game record first
+            if not store_game_record(game_rows, game_id):
+                raise RuntimeError(f"Could not store game record for {game_id}, skipping dependent inserts")
 
             # step 2 — store win/loss outcome
             result = get_home_team_result(game_rows)
@@ -134,7 +151,15 @@ def bulk_process(season: str, start_date: str, end_date: str, batch_size: int = 
             processor.process_play_by_play(game_id)
 
             success += 1
+            logger.info(f"Successfully processed {game_id}")
+
+            # pause between games
             time.sleep(3)
+
+            # extra pause between batches
+            if (i + 1) % batch_size == 0:
+                logger.info(f"Batch of {batch_size} complete — pausing 30 seconds")
+                time.sleep(30)
 
         except Exception as e:
             logger.error(f"Failed to process game {game_id}: {e}")
@@ -143,22 +168,25 @@ def bulk_process(season: str, start_date: str, end_date: str, batch_size: int = 
             time.sleep(5)
 
     logger.info(f"Bulk processing complete — {success} succeeded, {failed} failed")
+
     if failed_games:
         logger.warning(f"Failed games: {failed_games}")
-        # save failed games to file for retry
-        with open("failed_games.txt", "w") as f:
+        with open(f"failed_games_{season}_{season_type.replace(' ', '_')}.txt", "w") as f:
             f.write("\n".join(failed_games))
 
-    return {"success": success, "failed": failed, "failed_games": failed_games}
+    return {
+        "success":      success,
+        "failed":       failed,
+        "failed_games": failed_games
+    }
 
 
 if __name__ == "__main__":
-    import sys
+    season      = sys.argv[1] if len(sys.argv) > 1 else "2025-26"
+    start_date  = sys.argv[2] if len(sys.argv) > 2 else "2025-10-21"
+    end_date    = sys.argv[3] if len(sys.argv) > 3 else "2025-11-21"
+    batch_size  = int(sys.argv[4]) if len(sys.argv) > 4 else 50
+    start_from  = int(sys.argv[5]) if len(sys.argv) > 5 else 0
+    season_type = sys.argv[6] if len(sys.argv) > 6 else "Regular Season"
 
-    season     = sys.argv[1] if len(sys.argv) > 1 else "2025-26"
-    start_date = sys.argv[2] if len(sys.argv) > 2 else "2025-10-21"
-    end_date   = sys.argv[3] if len(sys.argv) > 3 else "2025-11-21"
-    batch_size = int(sys.argv[4]) if len(sys.argv) > 4 else 50
-    start_from = int(sys.argv[5]) if len(sys.argv) > 5 else 0
-
-    bulk_process(season, start_date, end_date, batch_size, start_from)
+    bulk_process(season, start_date, end_date, batch_size, start_from, season_type)

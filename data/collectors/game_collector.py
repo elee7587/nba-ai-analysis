@@ -63,8 +63,8 @@ class GameCollector:
                     "game_date":  str(game['gameEt']),
                     "home_team":  int(home_team['teamId']),
                     "away_team":  int(away_team['teamId']),
-                    "home_score": int(home_team['score']) if home_team['score'] else None,
-                    "away_score": int(away_team['score']) if away_team['score'] else None,
+                    "home_score": int(home_team['score']) if home_team['score'] not in (None, '') else None,
+                    "away_score": int(away_team['score']) if away_team['score'] not in (None, '') else None,
                     "season":     season
                 })
 
