@@ -191,7 +191,7 @@ class WinProbabilityModel:
 
         # clip extreme score margins (garbage time / data errors) so they
         # don't blow up the scaler, and keep the derived features consistent
-        margin_cap = 50
+        margin_cap = 40
         n_clipped = int((df['score_margin'].abs() > margin_cap).sum())
         if n_clipped:
             logger.info(f"Clipping {n_clipped} plays with |score_margin| > {margin_cap} (garbage time)")

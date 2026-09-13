@@ -1,4 +1,13 @@
 # bulk_pipeline.py
+#
+# NOTE: this intentionally does NOT capture TeamStandingsSnapshot rows for
+# backfilled dates. nba_api's LeagueStandingsV3 (see
+# data/collectors/standings_collector.py) has no as-of-date parameter — it
+# only ever returns the CURRENT live standings. Calling it here would write
+# rows stamped with a past snapshot_date but containing today's live
+# standings, which is worse than no row at all: it would look like real
+# history while being silently wrong. Standings snapshots only accumulate
+# correctly going forward from pipeline.py's daily run.
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))

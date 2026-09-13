@@ -32,7 +32,7 @@ def train_win_probability_model(seasons: list[str] = None, save_model: bool = Tr
 
     logger.info("Fitting on full training data")
     fit_metadata = model.train(df=df)
-
+    
     if save_model:
         model.save()
 

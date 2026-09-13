@@ -251,3 +251,42 @@ class GameOutcome(Base):
     home_won     = Column(Integer)  # 1 = home won, 0 = home lost
     season       = Column(String)
     created_at   = Column(DateTime, default=datetime.utcnow)
+
+
+class TeamStandingsSnapshot(Base):
+    """A dated snapshot of one team's league standing — deliberately NOT an
+    upsert-latest table like SeasonTeamStats. The composite primary key on
+    (snapshot_date, team_id) lets a "before this game" row and an "after
+    this game" row coexist for the same team, which is what the standings
+    video segment diffs. Populated once per day (league-wide, all 30 teams
+    at once) by data/processors/standings_processor.py, not per-game.
+
+    NOTE: nba_api's LeagueStandingsV3 has no as-of-date parameter — it only
+    ever returns the *current* live standings. That means a row's
+    snapshot_date reflects whenever it was actually captured, and there is
+    no way to backfill accurate snapshots for past dates. See
+    data/collectors/standings_collector.py and pipeline.py for detail.
+    """
+    __tablename__ = "team_standings_snapshots"
+
+    # "YYYY-MM-DD" — String, not DateTime like Game.game_date, so exact-match/range
+    # queries on a once-a-day snapshot have no time-of-day equality footguns.
+    snapshot_date        = Column(String, primary_key=True)
+    team_id              = Column(String, primary_key=True)
+    season               = Column(String)
+    conference           = Column(String)
+    division             = Column(String)
+    wins                 = Column(Integer)
+    losses               = Column(Integer)
+    win_pct              = Column(Float)
+    conference_rank      = Column(Integer)  # nba_api "PlayoffRank" — the team's conference seed, 1-15
+    division_rank        = Column(Integer)  # nba_api "DivisionRank"
+    conference_games_back = Column(Float)
+    division_games_back  = Column(Float)
+    conference_record    = Column(String)   # e.g. "8-4"
+    division_record      = Column(String)
+    home_record          = Column(String)   # nba_api "HOME"
+    road_record          = Column(String)   # nba_api "ROAD"
+    last_10              = Column(String)   # nba_api "L10"
+    current_streak       = Column(String)   # nba_api "strCurrentStreak", e.g. "W 3"
+    created_at           = Column(DateTime, default=datetime.utcnow)

@@ -42,6 +42,7 @@ analysis/
     win_probability.py         # WinProbabilityModel — fully designed (LogisticRegression + StandardScaler + CalibratedClassifierCV) but every method is a docstring-only stub
     train.py, evaluate.py, game_context.py   # empty (0 bytes) — not started
     saved/                      # referenced by MODEL_PATH but doesn't exist yet — no trained model artifacts anywhere in the repo
+  viz/                        # self-contained HTML/canvas short-form video segments — see Content vision below. Hand-authored sample data inline; not yet wired to Postgres or the LLM findings JSON
 
 streamlit/
   app.py                  # entry point (`streamlit run`) — human review/correction UI for agent findings, NOT an end-user dashboard
@@ -97,9 +98,14 @@ Four analyst agents run per game — scoring, team stats, player stats, MVP — 
 
 ## Direction / not yet built
 
-**No visualization or content-generation code exists anywhere in this repo today** — zero matplotlib/plotly/altair usage in actual code (altair is installed but unused), and no video/image export tooling (no moviepy, no ffmpeg calls). This is the gap between the current codebase and the stated mission above.
+**Content vision**: each game becomes a short-form (TikTok-style) video told as four sequential visual segments, each a self-contained HTML/canvas artifact in [analysis/viz/](analysis/viz/) (own inline `<style>`/`<script>`, no build step — open directly in a browser):
 
-The natural build path once the win-probability model is trained: `get_significant_moments()` / `detect_scoring_runs()` output → dynamic chart of win probability / momentum over the course of a game → short-form video/image export for social content. The existing JSON findings schema (`scoring_runs`, `momentum_shifts`, `team_outliers`, `player_outliers`, `mvp_candidates`) is the other natural input source for what to visualize.
+1. **Score wave** ([analysis/viz/score_wave.html](analysis/viz/score_wave.html)) — the opening beat, painting the overall picture: final score, who won, and momentum swings over the game. Two team-colored, semi-transparent "waves" (home = gray, away = orange) crash into each other at the score boundary over a court background, with a jagged/curved (not straight) seam where they meet. Built and mid-iteration.
+2. **Team stats comparison** — one level deeper: competing percentage bar charts per stat (FG%, 3P%, FT%, rebounds), gray-vs-orange and semi-transparent to match segment 1. Each row is a bidirectional bar competing outward from a shared center line — home grows left, away grows right — so the longer bar reads at a glance as "had the advantage." FG%/3P%/FT% rows show the make/attempt counts (e.g. FGM/FGA) alongside the percentage; the rebounds row is a stacked bar (OREB + DREB = TREB) rather than a plain percentage, using two shades of each team's color for the two segments. In progress.
+3. **Player highlights / MVP** — each team's MVP and their key stats. Not yet built; depends on the LLM MVP-candidate analyst output (see AI/LLM layer above), which the owner is actively building.
+4. **Box score** — final beat, points/rebounds/assists only (for now) for both teams. Not yet built.
+
+Segments 1–2 currently embed hand-authored sample data inline (no generator script wires real Postgres or LLM-findings data in yet — that's still to be built). The natural data path once the win-probability model is trained: `get_significant_moments()` / `detect_scoring_runs()` output feeds segment 1's momentum wave and segment 3's highlight selection, replacing manual scanning. The existing JSON findings schema (`scoring_runs`, `momentum_shifts`, `team_outliers`, `player_outliers`, `mvp_candidates`) is the other natural input for segments 2 and 3.
 
 ## Tech stack
 

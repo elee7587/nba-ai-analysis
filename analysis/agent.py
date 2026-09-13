@@ -281,6 +281,8 @@ class NBAAnalysisAgent:
                 "points": "points scored",
                 "rebounds": "total rebounds",
                 "assists": "assists",
+                "steals": "steals",
+                "blocks": "blocks",
                 "plus_minus": "plus/minus",
                 "net_rating": "net rating",
                 "true_shooting_pct": "true shooting percentage",

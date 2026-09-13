@@ -2,9 +2,26 @@
 from data.storage.db import SessionLocal
 from data.storage.models import (
     PlayByPlay, BoxScore_Player, BoxScore_Team,
-    AdvancedBoxScorePlayer, SeasonPlayerStats, SeasonTeamStats
+    AdvancedBoxScorePlayer, SeasonPlayerStats, SeasonTeamStats, QuarterScore
 )
 EXCLUDE_EVENT_TYPES = {'Timeout'}
+
+def get_quarter_scores(game_id: str) -> list:
+    """Per-team per-quarter point totals for a game — the granularity a
+    full-game box score comparison can't see (a team's final stat line can
+    look ordinary while one quarter or half was the actual story)."""
+    session = SessionLocal()
+    try:
+        rows = session.query(QuarterScore)\
+            .filter(QuarterScore.game_id == game_id)\
+            .order_by(QuarterScore.quarter)\
+            .all()
+        return [{"team": r.team, "quarter": r.quarter, "score": r.score} for r in rows]
+    except Exception as e:
+        print(f"Failed to get quarter scores for game {game_id}: {e}")
+        raise
+    finally:
+        session.close()
 
 def get_play_by_play_by_period(game_id: str) -> dict:
     """Returns play by play grouped by period"""
