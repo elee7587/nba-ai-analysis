@@ -18,8 +18,8 @@ venv/
 # VS Code
 .vscode/
 
-# ChromaDB
-./chroma_db
+# ChromaDB (persisted vector store — local state, not source)
+chroma_db/
 
 # Output
 output/
