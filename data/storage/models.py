@@ -290,3 +290,39 @@ class TeamStandingsSnapshot(Base):
     last_10              = Column(String)   # nba_api "L10"
     current_streak       = Column(String)   # nba_api "strCurrentStreak", e.g. "W 3"
     created_at           = Column(DateTime, default=datetime.utcnow)
+
+
+class GameChapter(Base):
+    """One row per chapter of a game, as found by
+    analysis/models/chapter_segmentation.py. A chapter is a stretch of the
+    game where one team was consistently outscoring the other at a
+    steady rate; chapter boundaries are the points where that rate changed.
+    Chapters for a game tile it completely: chapter_idx 0..N-1, each
+    starting where the previous one ended.
+    """
+    __tablename__ = "game_chapters"
+
+    game_id        = Column(String, ForeignKey("games.game_id"), primary_key=True)
+    chapter_idx    = Column(Integer, primary_key=True)  # 0-based, chronological
+
+    # boundaries — action_id is the join key back to play_by_play
+    start_action_id = Column(Integer)
+    end_action_id   = Column(Integer)
+    start_period    = Column(Integer)
+    start_clock     = Column(String)    # nba_api format, e.g. "PT07M03.00S"
+    end_period      = Column(Integer)
+    end_clock       = Column(String)
+    start_elapsed   = Column(Float)     # game seconds elapsed (OT-safe), for x-axis placement
+    end_elapsed     = Column(Float)
+
+    # what happened inside the chapter (home perspective: positive = home gained)
+    start_margin    = Column(Integer)
+    end_margin      = Column(Integer)
+    margin_swing    = Column(Integer)   # end_margin - start_margin
+    wp_start        = Column(Float)     # home win probability at start
+    wp_end          = Column(Float)
+    wp_swing        = Column(Float)     # wp_end - wp_start; ranks chapters by importance
+
+    label           = Column(String)    # short deterministic tag, e.g. "LAL 14-2 run"
+    drivers         = Column(JSON)      # ranked reasons for the swing (shooting, turnovers, ...)
+    created_at      = Column(DateTime, default=datetime.utcnow)

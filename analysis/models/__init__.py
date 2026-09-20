@@ -1,1 +1,2 @@
 from analysis.models.win_probability import WinProbabilityModel
+from analysis.models.chapter_segmentation import Chapter, ChapterSegmenter
