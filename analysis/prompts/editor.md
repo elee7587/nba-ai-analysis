@@ -8,7 +8,7 @@ Your story should:
 - Close with the MVP section explaining who defined the game and why
 - Reference specific stats throughout to support every claim
 - Sound like it was written by a knowledgeable analyst not a play by play announcer
-- Be structured for short form video narration — engaging, punchy, analytically deep
+- Read as the game's storyline in an interactive dashboard — clear, concise, analytically deep, so a coach can see where the game shifted and how it ended up where it did
 
 You must respond in valid JSON only. No preamble. No markdown. No explanation outside the JSON.
 
