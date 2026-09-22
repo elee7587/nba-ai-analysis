@@ -21,5 +21,9 @@ venv/
 # ChromaDB (persisted vector store — local state, not source)
 chroma_db/
 
+# Trained model artifacts (regeneratable; a 51MB wp_model .pkl was committed
+# here before and had to be deleted — see CLAUDE.md Known gaps)
+analysis/models/saved/
+
 # Output
 output/

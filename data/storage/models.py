@@ -293,12 +293,13 @@ class TeamStandingsSnapshot(Base):
 
 
 class GameChapter(Base):
-    """One row per chapter of a game, as found by
-    analysis/models/chapter_segmentation.py. A chapter is a stretch of the
-    game where one team was consistently outscoring the other at a
-    steady rate; chapter boundaries are the points where that rate changed.
-    Chapters for a game tile it completely: chapter_idx 0..N-1, each
-    starting where the previous one ended.
+    """One row per chapter of a game, as produced by
+    analysis/models/chapter_segmentation.py. Chapters are a *descriptive*
+    partition of the game's score-margin curve into a fixed number of
+    stretches (see the analysis in analysis/exploration/chapter_eda.py) —
+    they are not claims of statistically distinct regimes. Chapters tile the
+    game completely: chapter_idx 0..K-1, each starting at the play where the
+    previous one ended, so margin_swing values sum to the final margin.
     """
     __tablename__ = "game_chapters"
 
@@ -319,10 +320,38 @@ class GameChapter(Base):
     start_margin    = Column(Integer)
     end_margin      = Column(Integer)
     margin_swing    = Column(Integer)   # end_margin - start_margin
-    wp_start        = Column(Float)     # home win probability at start
-    wp_end          = Column(Float)
-    wp_swing        = Column(Float)     # wp_end - wp_start; ranks chapters by importance
+    home_points     = Column(Integer)   # points scored by home inside the chapter
+    away_points     = Column(Integer)
 
-    label           = Column(String)    # short deterministic tag, e.g. "LAL 14-2 run"
-    drivers         = Column(JSON)      # ranked reasons for the swing (shooting, turnovers, ...)
+    label           = Column(String)    # short deterministic tag, e.g. "LAL +11 (28-17)"
+    drivers         = Column(JSON)      # ranked reasons for the swing; empty until compute_drivers exists
     created_at      = Column(DateTime, default=datetime.utcnow)
+
+
+class GameArchetype(Base):
+    """One row per game: which whole-game shape cluster it belongs to, as
+    produced by analysis/models/game_archetypes.py. This clusters each
+    game's *entire* regulation-time margin curve (from the eventual winner's
+    perspective, so a comeback is a comeback regardless of home/away) across
+    a season — a different, and less fraught, exercise than GameChapter's
+    per-game boundary finding: chapter_eda.py found no more within-game
+    regime structure than chance, but whole-game shapes (blowout vs seesaw
+    vs comeback) are just observably different curves, no significance test
+    required.
+
+    Feeds ChapterSegmenter: cluster_id maps to a fixed chapter count `k`
+    (derived from the cluster's average margin-drift complexity, bucketed
+    into a bounded range — see game_archetypes.py), so chapter granularity
+    can vary by game shape without any single game picking its own count.
+    archetype_id and k are meaningful only within the same model_version;
+    a re-fit reassigns both for every game.
+    """
+    __tablename__ = "game_archetypes"
+
+    game_id       = Column(String, ForeignKey("games.game_id"), primary_key=True)
+    archetype_id  = Column(Integer)   # cluster index (within model_version)
+    label         = Column(String)    # deterministic heuristic label for the cluster's centroid shape
+    k             = Column(Integer)   # chapter count ChapterSegmenter should use for this game
+    complexity    = Column(Float)     # total variation of this game's margin drift (input to the k mapping)
+    model_version = Column(String)    # timestamp tag of the clustering run that produced this row
+    created_at    = Column(DateTime, default=datetime.utcnow)

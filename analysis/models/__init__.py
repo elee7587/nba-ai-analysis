@@ -1,2 +1,3 @@
 from analysis.models.win_probability import WinProbabilityModel
 from analysis.models.chapter_segmentation import Chapter, ChapterSegmenter
+from analysis.models.game_archetypes import GameArchetype, GameArchetypeClassifier

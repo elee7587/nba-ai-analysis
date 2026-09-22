@@ -7,9 +7,10 @@ For the full architecture, data model, current build status, and known gaps, see
 ## What's here
 
 - **Data pipeline** — scrapes `nba_api` into PostgreSQL: games, box scores, advanced stats, play-by-play, season stats, daily standings snapshots
-- **Win-probability model** — a per-play win-probability model (logistic regression, calibrated). Used as an instrument for measuring how much each moment mattered, not to predict winners
+- **Game chapters** — each game is split into four chapters that summarize the shape of its score-margin curve, with a short label per chapter (e.g. `MEM +11 (26-15)`). Descriptive, not a claim of statistical "momentum shifts" — analysis of 2,619 games found real games are, if anything, *less* streaky than chance (see `analysis/exploration/chapter_eda.py`)
+- **Win-probability model** *(currently unavailable)* — code for a per-play win-probability model exists, but the trained model was **removed**: it was trained on features where the running score was zeroed on non-scoring plays, so its output couldn't be trusted. It will be fixed and retrained; it's intended to rank how much each chapter or moment mattered, not to predict winners
 - **AI analysis agents** — local-LLM (Ollama) agents that surface scoring runs, momentum shifts, statistical outliers, and MVP candidates per game, refined through a human-correction loop in Streamlit
-- **Story-driven dashboard** *(not yet built)* — the goal: a chaptered, interactive Streamlit view of each game, backed by additional ML models (game-chapter segmentation, game-shape archetypes, per-player win probability added) and an agentic writer/editor workflow
+- **Story-driven dashboard** *(not yet built)* — the goal: a chaptered, interactive Streamlit view of each game, backed by further ML models (why each chapter happened, player and bench impact, game-shape archetypes) and an agentic writer/editor workflow
 
 ## Setup
 
@@ -28,6 +29,16 @@ LLM analysis requires [Ollama](https://ollama.com) running locally with `qwen2.5
 ```bash
 python pipeline.py [YYYY-MM-DD]        # collect one day's games (defaults to today)
 python bulk_pipeline.py <season> <start_date> <end_date>   # backfill a date range
-python analysis/models/train.py        # train and save the win-probability model
+python analysis/exploration/chapter_eda.py   # rerun the chapter analysis (figures land in output/chapter_eda/)
 streamlit run streamlit/app.py         # review/correct AI-generated findings
+```
+
+Segment games into chapters from Python (creates the `game_chapters` table if needed):
+
+```python
+from analysis.models import ChapterSegmenter
+seg = ChapterSegmenter()                          # 4 chapters per game by default
+chapters = seg.segment_game("0022500002")         # one game
+seg.save_chapters("0022500002", chapters)
+seg.segment_season(["22025"])                     # a whole season code
 ```
