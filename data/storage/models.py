@@ -35,7 +35,6 @@ class BoxScore_Player(Base):
     team_id   = Column(String)  # team ID
     team_abbrev = Column(String)  # team abbreviation
     team_city = Column(String)    # team city
-    player_id = Column(String)  # player ID from NBA API
     player_name = Column(String)  # player name
     nickname = Column(String)  # player nickname
     start_position = Column(String)  # starting position (e.g. "Guard")
@@ -243,3 +242,116 @@ class SeasonPlayerStats(Base):
     dd2               = Column(Integer)
     td3               = Column(Integer)
     last_updated      = Column(DateTime)
+
+class GameOutcome(Base):
+    __tablename__ = "game_outcomes"
+
+    game_id      = Column(String, ForeignKey("games.game_id"), primary_key=True)
+    home_team_id = Column(String)
+    home_won     = Column(Integer)  # 1 = home won, 0 = home lost
+    season       = Column(String)
+    created_at   = Column(DateTime, default=datetime.utcnow)
+
+
+class TeamStandingsSnapshot(Base):
+    """A dated snapshot of one team's league standing — deliberately NOT an
+    upsert-latest table like SeasonTeamStats. The composite primary key on
+    (snapshot_date, team_id) lets a "before this game" row and an "after
+    this game" row coexist for the same team, which is what the standings
+    video segment diffs. Populated once per day (league-wide, all 30 teams
+    at once) by data/processors/standings_processor.py, not per-game.
+
+    NOTE: nba_api's LeagueStandingsV3 has no as-of-date parameter — it only
+    ever returns the *current* live standings. That means a row's
+    snapshot_date reflects whenever it was actually captured, and there is
+    no way to backfill accurate snapshots for past dates. See
+    data/collectors/standings_collector.py and pipeline.py for detail.
+    """
+    __tablename__ = "team_standings_snapshots"
+
+    # "YYYY-MM-DD" — String, not DateTime like Game.game_date, so exact-match/range
+    # queries on a once-a-day snapshot have no time-of-day equality footguns.
+    snapshot_date        = Column(String, primary_key=True)
+    team_id              = Column(String, primary_key=True)
+    season               = Column(String)
+    conference           = Column(String)
+    division             = Column(String)
+    wins                 = Column(Integer)
+    losses               = Column(Integer)
+    win_pct              = Column(Float)
+    conference_rank      = Column(Integer)  # nba_api "PlayoffRank" — the team's conference seed, 1-15
+    division_rank        = Column(Integer)  # nba_api "DivisionRank"
+    conference_games_back = Column(Float)
+    division_games_back  = Column(Float)
+    conference_record    = Column(String)   # e.g. "8-4"
+    division_record      = Column(String)
+    home_record          = Column(String)   # nba_api "HOME"
+    road_record          = Column(String)   # nba_api "ROAD"
+    last_10              = Column(String)   # nba_api "L10"
+    current_streak       = Column(String)   # nba_api "strCurrentStreak", e.g. "W 3"
+    created_at           = Column(DateTime, default=datetime.utcnow)
+
+
+class GameChapter(Base):
+    """One row per chapter of a game, as produced by
+    analysis/models/chapter_segmentation.py. Chapters are a *descriptive*
+    partition of the game's score-margin curve into a fixed number of
+    stretches (see the analysis in analysis/exploration/chapter_eda.py) —
+    they are not claims of statistically distinct regimes. Chapters tile the
+    game completely: chapter_idx 0..K-1, each starting at the play where the
+    previous one ended, so margin_swing values sum to the final margin.
+    """
+    __tablename__ = "game_chapters"
+
+    game_id        = Column(String, ForeignKey("games.game_id"), primary_key=True)
+    chapter_idx    = Column(Integer, primary_key=True)  # 0-based, chronological
+
+    # boundaries — action_id is the join key back to play_by_play
+    start_action_id = Column(Integer)
+    end_action_id   = Column(Integer)
+    start_period    = Column(Integer)
+    start_clock     = Column(String)    # nba_api format, e.g. "PT07M03.00S"
+    end_period      = Column(Integer)
+    end_clock       = Column(String)
+    start_elapsed   = Column(Float)     # game seconds elapsed (OT-safe), for x-axis placement
+    end_elapsed     = Column(Float)
+
+    # what happened inside the chapter (home perspective: positive = home gained)
+    start_margin    = Column(Integer)
+    end_margin      = Column(Integer)
+    margin_swing    = Column(Integer)   # end_margin - start_margin
+    home_points     = Column(Integer)   # points scored by home inside the chapter
+    away_points     = Column(Integer)
+
+    label           = Column(String)    # short deterministic tag, e.g. "LAL +11 (28-17)"
+    drivers         = Column(JSON)      # ranked reasons for the swing; empty until compute_drivers exists
+    created_at      = Column(DateTime, default=datetime.utcnow)
+
+
+class GameArchetype(Base):
+    """One row per game: which whole-game shape cluster it belongs to, as
+    produced by analysis/models/game_archetypes.py. This clusters each
+    game's *entire* regulation-time margin curve (from the eventual winner's
+    perspective, so a comeback is a comeback regardless of home/away) across
+    a season — a different, and less fraught, exercise than GameChapter's
+    per-game boundary finding: chapter_eda.py found no more within-game
+    regime structure than chance, but whole-game shapes (blowout vs seesaw
+    vs comeback) are just observably different curves, no significance test
+    required.
+
+    Feeds ChapterSegmenter: cluster_id maps to a fixed chapter count `k`
+    (derived from the cluster's average margin-drift complexity, bucketed
+    into a bounded range — see game_archetypes.py), so chapter granularity
+    can vary by game shape without any single game picking its own count.
+    archetype_id and k are meaningful only within the same model_version;
+    a re-fit reassigns both for every game.
+    """
+    __tablename__ = "game_archetypes"
+
+    game_id       = Column(String, ForeignKey("games.game_id"), primary_key=True)
+    archetype_id  = Column(Integer)   # cluster index (within model_version)
+    label         = Column(String)    # deterministic heuristic label for the cluster's centroid shape
+    k             = Column(Integer)   # chapter count ChapterSegmenter should use for this game
+    complexity    = Column(Float)     # total variation of this game's margin drift (input to the k mapping)
+    model_version = Column(String)    # timestamp tag of the clustering run that produced this row
+    created_at    = Column(DateTime, default=datetime.utcnow)
